@@ -60,8 +60,11 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment variables
+# Environment variables and credentials
 .env
+spotify.env
+youtube_music.env
+amazon_music.env
 
 # IDE
 .vscode/
@@ -85,10 +88,18 @@ Desktop.ini
 
 # Application-specific
 playlist_history.json
+*_usage_history.json
+youtube_usage_history.json
 *.log
 .history/
 
 # Spotify API tokens (if any)
 *.token
 access_token.json
-refresh_token.json 
+refresh_token.json
+
+# OAuth credentials and tokens
+client_secret_*.json
+youtube_token.json
+*.token
+*_token.json 
