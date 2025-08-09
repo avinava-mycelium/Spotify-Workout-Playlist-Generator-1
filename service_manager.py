@@ -304,6 +304,10 @@ REFERENCE_PLAYLIST_ID=your_playlist_id_here
 # Optional: Playlist settings
 TARGET_PLAYLIST_NAME=Daily Workout Mix
 PLAYLIST_SIZE=30
+ 
+ # Optional: YTMusic headers file to access likes/library (export from browser)
+ # Example path: /Users/you/ytmusic_headers.json
+ YTMUSIC_HEADERS_FILE=
 """
         elif service_type == MusicServiceType.AMAZON_MUSIC:
             template = """# Amazon Music Configuration

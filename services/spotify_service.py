@@ -324,6 +324,23 @@ class SpotifyService(BaseMusicService):
             tracks.append(track_info)
         
         return tracks 
+
+    async def get_recently_played_ids(self, limit: int = 50) -> List[str]:
+        """Get IDs of recently played tracks to avoid repeats."""
+        if not self.authenticated or not self.client:
+            raise Exception("Not authenticated with Spotify")
+        try:
+            results = self.client.current_user_recently_played(limit=min(limit, 50))
+            ids = []
+            for item in results.get('items', []):
+                track = item.get('track') or {}
+                tid = track.get('id')
+                if tid:
+                    ids.append(tid)
+            return ids
+        except Exception as e:
+            logger.warning(f"Failed to fetch recently played: {e}")
+            return []
     async def get_recommendations(self, seed_artists: List[str] = None, seed_genres: List[str] = None, 
                                  seed_tracks: List[str] = None, limit: int = 20, **audio_features) -> List[TrackInfo]:
         """Get track recommendations using Spotify's powerful recommendations API.
@@ -377,4 +394,15 @@ class SpotifyService(BaseMusicService):
             
         except Exception as e:
             logger.error(f"Failed to get recommendations: {e}")
+            return []
+
+    async def get_available_genre_seeds(self) -> List[str]:
+        """Get Spotify's allowed genre seeds for recommendations."""
+        if not self.authenticated or not self.client:
+            raise Exception("Not authenticated with Spotify")
+        try:
+            result = self.client.recommendations_genre_seeds()
+            return result.get('genres', [])
+        except Exception as e:
+            logger.warning(f"Failed to fetch available genre seeds: {e}")
             return []

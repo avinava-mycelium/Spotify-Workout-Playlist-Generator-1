@@ -99,10 +99,17 @@ class SpotifyDiscoveryEngine(BaseDiscoveryEngine):
         
         # Also add user's saved tracks to known list
         try:
-            saved_tracks = await self.spotify.get_user_saved_tracks(limit=50)
+            saved_tracks = await self.spotify.get_user_saved_tracks(limit=200)
             known_track_ids.update(track.id for track in saved_tracks)
         except Exception as e:
             logger.warning(f"Could not get saved tracks: {e}")
+
+        # Also add recently played track IDs to avoid repeats
+        try:
+            recent_ids = await self.spotify.get_recently_played_ids(limit=50)
+            known_track_ids.update(recent_ids)
+        except Exception as e:
+            logger.warning(f"Could not get recently played tracks: {e}")
         
         taste_profile = {
             'genres': top_genres,
@@ -240,7 +247,13 @@ class SpotifyDiscoveryEngine(BaseDiscoveryEngine):
         try:
             # Spotify recommendations API parameters
             seed_artists = [artist.id for artist in taste_profile['artist_infos'][:5]]  # Max 5 seed artists
-            seed_genres = taste_profile['genres'][:5]  # Max 5 seed genres
+            seed_genres = []
+            # Validate genres against Spotify's allowed seeds to avoid 400 errors
+            try:
+                allowed = set(await self.spotify.get_available_genre_seeds())
+                seed_genres = [g for g in taste_profile['genres'][:5] if g in allowed]
+            except Exception:
+                seed_genres = taste_profile['genres'][:5]
             
             # Audio feature targets for workout music
             audio_features = {

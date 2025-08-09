@@ -92,9 +92,19 @@ class YouTubeMusicService(BaseMusicService):
                     # Initialize YouTube Data API v3 with OAuth credentials
                     self.youtube_api = build('youtube', 'v3', credentials=self.credentials)
                     
-                    # Initialize YTMusic for public data (search, etc.)
-                    # Note: YTMusic requires browser auth for full functionality
-                    self.ytmusic = YTMusic()
+                    # Initialize YTMusic
+                    # If headers file is provided, use it to enable access to likes/library
+                    headers_file = self.config.get('YTMUSIC_HEADERS_FILE') or self.config.get('YT_HEADERS_FILE')
+                    try:
+                        if headers_file and Path(headers_file).exists():
+                            logger.info(f"Initializing YTMusic with headers file: {headers_file}")
+                            self.ytmusic = YTMusic(headers_file)
+                        else:
+                            # Fallback to limited mode
+                            self.ytmusic = YTMusic()
+                    except Exception as e_init:
+                        logger.warning(f"YTMusic headers init failed, using limited mode: {e_init}")
+                        self.ytmusic = YTMusic()
                     
                     self.authenticated = True
                     logger.info("Successfully authenticated with YouTube Music")
@@ -452,6 +462,53 @@ class YouTubeMusicService(BaseMusicService):
             
         except Exception as e:
             logger.error(f"Search failed: {e}")
+            return []
+
+    async def search_recent_music(self, query: str, limit: int = 20, days: int = 365) -> List[TrackInfo]:
+        """Search YouTube for recent music videos by publish date using Data API.
+
+        This uses order=date and publishedAfter to bias toward fresh uploads.
+        """
+        if not self.authenticated or not self.youtube_api:
+            raise Exception("Not authenticated with YouTube Music")
+
+        try:
+            from datetime import datetime, timedelta, timezone
+            published_after = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            request = self.youtube_api.search().list(
+                part="snippet",
+                q=query,
+                maxResults=min(limit, 50),
+                type="video",
+                order="date",
+                publishedAfter=published_after,
+                videoCategoryId="10"  # Music
+            )
+            response = request.execute()
+
+            tracks: List[TrackInfo] = []
+            for item in response.get('items', []):
+                video_id = item['id'].get('videoId')
+                snippet = item.get('snippet', {})
+                title = snippet.get('title', 'Unknown')
+                channel = snippet.get('channelTitle', 'Unknown Artist')
+                if not video_id:
+                    continue
+                tracks.append(TrackInfo(
+                    id=video_id,
+                    name=title,
+                    artist=channel,
+                    album='Unknown',
+                    uri=f"https://music.youtube.com/watch?v={video_id}",
+                    external_url=f"https://www.youtube.com/watch?v={video_id}",
+                    duration_ms=0,
+                    explicit=False,
+                    popularity=None
+                ))
+
+            return tracks
+        except Exception as e:
+            logger.error(f"Recent music search failed: {e}")
             return []
     
     async def get_artist_info(self, artist_id: str) -> ArtistInfo:
